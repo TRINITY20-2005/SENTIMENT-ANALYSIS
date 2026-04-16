@@ -16,15 +16,12 @@ from wordcloud import WordCloud
 import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 
-# --- CONFIGURATION ---
-# Replace with your actual API Key from Google Cloud Console
+
 API_KEY = "AIzaSyBSd-mps4Vy5hOWV0tm8EN-YUnsb3O7Q3I"
 
-# Replace with the Video ID you want to analyze
-# (Found in the URL after 'v=', e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ -> dQw4w9WgXcQ)
 VIDEO_ID = "MK83clSv6-k"
 
-# Limit the number of comments to fetch to avoid hitting API quotas too quickly
+
 MAX_COMMENTS = 200
 
 def get_youtube_comments(api_key, video_id, max_results=100):
@@ -32,8 +29,7 @@ def get_youtube_comments(api_key, video_id, max_results=100):
     Fetches top-level comments from a specific YouTube video using the YouTube Data API.
     """
     try:
-        # Disable OAuthlib's HTTPS verification when running locally.
-        # DO NOT leave this in production code.
+      
         os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
         api_service_name = "youtube"
@@ -47,7 +43,7 @@ def get_youtube_comments(api_key, video_id, max_results=100):
             part="snippet",
             videoId=video_id,
             textFormat="plainText",
-            maxResults=min(max_results, 100) # API allows max 100 per page
+            maxResults=min(max_results, 100) 
         )
 
         print(f"Fetching comments for video ID: {video_id}...")
@@ -60,8 +56,6 @@ def get_youtube_comments(api_key, video_id, max_results=100):
                 comment = item['snippet']['topLevelComment']['snippet']['textDisplay']
                 author = item['snippet']['topLevelComment']['snippet']['authorDisplayName']
                 comments.append({'author': author, 'comment': comment})
-
-            # Check if there is a next page
             if 'nextPageToken' in response and len(comments) < max_results:
                 request = youtube.commentThreads().list(
                     part="snippet",
@@ -87,9 +81,9 @@ def clean_text(text):
     """
     if not isinstance(text, str):
         return ""
-    # Remove URLs
+
     text = re.sub(r'http\S+', '', text)
-    # Remove newlines
+
     text = text.replace('\n', ' ')
     return text.strip()
 
@@ -103,9 +97,7 @@ def analyze_sentiment(df):
 
     analyzer = SentimentIntensityAnalyzer()
 
-    # Calculate scores
-    # VADER returns a dict: {'neg': 0.0, 'neu': 0.0, 'pos': 0.0, 'compound': 0.0}
-    # Compound score ranges from -1 (Most Negative) to +1 (Most Positive)
+  
     df['scores'] = df['comment'].apply(lambda x: analyzer.polarity_scores(clean_text(x)))
 
     df['compound'] = df['scores'].apply(lambda x: x['compound'])
@@ -113,7 +105,6 @@ def analyze_sentiment(df):
     df['neu_score'] = df['scores'].apply(lambda x: x['neu'])
     df['neg_score'] = df['scores'].apply(lambda x: x['neg'])
 
-    # Categorize based on compound score
     def get_sentiment_label(score):
         if score >= 0.05:
             return 'Positive'
@@ -133,7 +124,7 @@ def visualize_results(df):
         print("No data to visualize.")
         return
 
-    # 1. Bar Chart
+
     plt.figure(figsize=(8, 6))
     sentiment_counts = df['sentiment'].value_counts()
     colors = {'Positive': 'green', 'Neutral': 'gray', 'Negative': 'red'}
@@ -145,12 +136,10 @@ def visualize_results(df):
     plt.xticks(rotation=0)
     plt.grid(axis='y', linestyle='--', alpha=0.7)
 
-    # Save or Show
     plt.tight_layout()
     print("Displaying Bar Chart...")
     plt.show()
 
-    # 2. Word Cloud
     all_text = " ".join(comment for comment in df.comment)
     wordcloud = WordCloud(width=800, height=400, background_color ='white', min_font_size=10).generate(all_text)
 
@@ -162,25 +151,20 @@ def visualize_results(df):
     plt.show()
 
 if __name__ == "__main__":
-    # 1. Fetch Data
     if API_KEY == "YOUR_API_KEY_HERE":
         print("WARNING: Please replace 'YOUR_API_KEY_HERE' with your actual Google API Key.")
     else:
         df = get_youtube_comments(API_KEY, VIDEO_ID, MAX_COMMENTS)
 
         if not df.empty:
-            # 2. Analyze Sentiment
             df = analyze_sentiment(df)
 
-            # Display first few rows with sentiment
             print("\n--- Analysis Preview ---")
             print(df[['comment', 'sentiment', 'compound']].head())
 
-            # Print Summary
             print("\n--- Sentiment Summary ---")
             print(df['sentiment'].value_counts())
 
-            # 3. Visualize
             visualize_results(df)
         else:
             print("No comments found or error occurred.")
